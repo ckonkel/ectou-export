@@ -96,9 +96,23 @@ umount $MNT
 
 # Install VirtualBox rpm to run VBoxManage convertdd
 # Warnings about compiling vboxdrv kernel module are expected
-wget http://download.virtualbox.org/virtualbox/5.1.8/VirtualBox-5.1-5.1.8_111374_el6-1.x86_64.rpm
+
+#wget "http://download.virtualbox.org/virtualbox/5.1.8/VirtualBox-5.1-5.1.8_111374_el6-1.x86_64.rpm"
+# chriskxl@gmail changed from wget to curl because of this error (note this would only happen when using export.py in ansible):
+# "+ wget http://download.virtualbox.org/virtualbox/5.1.8/VirtualBox-5.1-5.1.8_111374_el6-1.x86_64.rpm",
+#        "--2017-01-18 22:46:04--  http://download.virtualbox.org/virtualbox/5.1.8/VirtualBox-5.1-5.1.8_111374_el6-1.x86_64.rpm",
+#        "Resolving download.virtualbox.org (download.virtualbox.org)... 104.96.220.152, 104.96.220.162",
+#        "Connecting to download.virtualbox.org (download.virtualbox.org)|104.96.220.152|:80... connected.",
+#        "HTTP request sent, awaiting response... 200 OK",
+#        "Length: 78950268 (75M) [application/x-redhat-package-manager]",
+#        "exception 'ascii' codec can't encode character u'\\u2018' in position 11: ordinal not in range(128)",
+#        "Press return to continue: terminate ec2.Instance(id='i-09c4dd147a3cd45e1')",
+#        "wait for termination ec2.Instance(id='i-09c4dd147a3cd45e1')",
+#        "delete ec2.SecurityGroup(id='sg-b74794cb')",
+#        "delete ec2.KeyPair(name='ectou-export-8f1e89f9-cfe5-4ac7-af0b-436df5f67a47')"
+
+curl -OL http://download.virtualbox.org/virtualbox/5.1.8/VirtualBox-5.1-5.1.8_111374_el6-1.x86_64.rpm
 echo "756149c11f4cab8f72648c6a3c9e51e7 VirtualBox-5.1-5.1.8_111374_el6-1.x86_64.rpm" | md5sum -c /dev/stdin
 rpm -i --nodeps VirtualBox-5.1-5.1.8_111374_el6-1.x86_64.rpm
-
 VBoxManage convertdd "${device}" "${vmdk}" --format VMDK
 chmod 644 "${vmdk}"
