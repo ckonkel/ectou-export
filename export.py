@@ -184,7 +184,7 @@ def get_parser():
                    default="amazon",
                    help="Source image owner")
     g.add_argument("--ami-name",
-                   default="amzn-ami-hvm-2016.03.3.x86_64-gp2",
+                   default="amzn-ami-hvm-2016.09.0.20161028-x86_64-gp2",
                    help="Source image name")
 
     g = parser.add_argument_group("Builder")
@@ -192,7 +192,7 @@ def get_parser():
                    default="amazon",
                    help="Builder image owner")
     g.add_argument("--builder-ami-name",
-                   default="amzn-ami-hvm-2016.03.3.x86_64-gp2",
+                   default="amzn-ami-hvm-2016.09.0.20161028-x86_64-gp2",
                    help="Builder image name")
     g.add_argument("--builder-username",
                    default="ec2-user")
@@ -206,7 +206,9 @@ def get_parser():
     g.add_argument("--device-name",
                    default="/dev/xvdf",
                    help="Attach source image to this device.")
-
+    g.add_argument("--private-network",
+                   default="false",
+                   help="true or false - Include switch if you want private instance")
     g = parser.add_argument_group("Provisioner")
     g.add_argument("--yum-proxy",
                    default="")
@@ -259,6 +261,14 @@ def main():
     vpc_id = vpc.id if vpc else ""
     subnet_id = subnet.id if subnet else ""
 
+    # crk@balfour Have option to use private instance
+    if args.private_network == "true":
+        network_type = "private_ip_address"
+        associate_ip = False
+    else:
+        network_type = "public_ip_address"
+        associate_ip = True
+
     with resource_cleanup(args.debug) as cleanup:
 
         # Create temporary key pair
@@ -289,7 +299,7 @@ def main():
                                                           DeviceIndex=0,
                                                           SubnetId=subnet_id,
                                                           Groups=[sg.id],
-                                                          AssociatePublicIpAddress=True,
+                                                          AssociatePublicIpAddress=associate_ip,
                                                   )]))
         defer_terminate(cleanup, instance)
 
@@ -305,9 +315,9 @@ def main():
             f.write(key_pair.key_material)
 
         print "To access instance for debugging:"
-        print "  ssh -i {} {}@{}".format(PRIVATE_KEY_FILE, args.builder_username, instance.public_ip_address)
+        print "  ssh -i {} {}@{}".format(PRIVATE_KEY_FILE, args.builder_username, getattr(instance, network_type))
 
-        ssh_client = connect_ssh(args.builder_username, instance.public_ip_address, PRIVATE_KEY_FILE)
+        ssh_client = connect_ssh(args.builder_username, getattr(instance, network_type), PRIVATE_KEY_FILE)
 
         # Export device to vmdk
         provision_file_put(ssh_client, EXPORT_SCRIPT, "export.sh")
