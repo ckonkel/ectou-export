@@ -184,14 +184,15 @@ def get_parser():
                    default="amazon",
                    help="Source image owner")
     g.add_argument("--ami-name",
-                   default="amzn-ami-hvm-2016.09.1.20170119-x86_64-gp2",
+                   default="amzn-ami-hvm-2016.09.0.20161028-x86_64-gp2",
                    help="Source image name")
+
     g = parser.add_argument_group("Builder")
     g.add_argument("--builder-ami-owner",
                    default="amazon",
                    help="Builder image owner")
     g.add_argument("--builder-ami-name",
-                   default="amzn-ami-hvm-2016.09.1.20170119-x86_64-gp2",
+                   default="amzn-ami-hvm-2016.09.0.20161028-x86_64-gp2",
                    help="Builder image name")
     g.add_argument("--builder-username",
                    default="ec2-user")
@@ -222,10 +223,12 @@ def get_parser():
 def main():
     args = get_parser().parse_args()
 
+    buildtime = "{dt:%Y%m%d%H%M}".format(dt=datetime.datetime.utcnow())
+
     prefix = args.output_prefix
     if not prefix:
-        prefix = "{source_ami_name}-{dt:%Y%m%d%H%M}".format(source_ami_name=args.ami_name,
-                                                            dt=datetime.datetime.utcnow())
+        prefix = "{source_ami_name}-{dt}".format(source_ami_name=args.ami_name,
+                                                            dt=buildtime)
 
     vmdk = prefix + ".vmdk"
     box = prefix + ".box"
@@ -271,65 +274,68 @@ def main():
     with resource_cleanup(args.debug) as cleanup:
 
         # Create temporary key pair
-        key_pair = ec2.create_key_pair(KeyName=run_name)
-        defer_delete(cleanup, key_pair)
-
-        # Create temporary security group
-        sg = ec2.create_security_group(GroupName=run_name,
-                                       Description="Temporary security group for ectou-export",
-                                       VpcId=vpc_id)
-        defer_delete(cleanup, sg)
-
-        # Enable ssh access
-        sg.authorize_ingress(IpPermissions=[dict(
-                IpProtocol="tcp",
-                FromPort=22,
-                ToPort=22,
-                IpRanges=[dict(CidrIp="0.0.0.0/0")],
-        )])
-
-        # Launch builder EC2 instance
-        instance = get_first(ec2.create_instances(ImageId=builder_image.id,
-                                                  MinCount=1,
-                                                  MaxCount=1,
-                                                  KeyName=key_pair.name,
-                                                  InstanceType=args.instance_type,
-                                                  NetworkInterfaces=[dict(
-                                                          DeviceIndex=0,
-                                                          SubnetId=subnet_id,
-                                                          Groups=[sg.id],
-                                                          AssociatePublicIpAddress=associate_ip,
-                                                  )]))
-        defer_terminate(cleanup, instance)
-
-        instance.create_tags(Tags=[{"Key": "Name", "Value": run_name}])
-        instance.wait_until_running()
-
-        # Attach source image as device
-        attach_ebs_image(ec2, instance, source_image, args.device_name)
-
-        # Save key pair for ssh
-        with open(PRIVATE_KEY_FILE, "w") as f:
-            os.chmod(PRIVATE_KEY_FILE, 0o600)
-            f.write(key_pair.key_material)
-
-        print "To access instance for debugging:"
-        print "  ssh -i {} {}@{}".format(PRIVATE_KEY_FILE, args.builder_username, getattr(instance, network_type))
-
-        ssh_client = connect_ssh(args.builder_username, getattr(instance, network_type), PRIVATE_KEY_FILE)
-
-        # Export device to vmdk
-        provision_file_put(ssh_client, EXPORT_SCRIPT, "export.sh")
-        provision_shell(ssh_client, ["sudo", "bash", "export.sh", args.device_name, "export.vmdk", args.yum_proxy],
-                        get_pty=True)
-        provision_file_get(ssh_client, "export.vmdk", vmdk)
+#         key_pair = ec2.create_key_pair(KeyName=run_name)
+#         defer_delete(cleanup, key_pair)
+#
+#         # Create temporary security group
+#         sg = ec2.create_security_group(GroupName=run_name,
+#                                        Description="Temporary security group for ectou-export",
+#                                        VpcId=vpc_id)
+#         defer_delete(cleanup, sg)
+#
+#         # Enable ssh access
+#         sg.authorize_ingress(IpPermissions=[dict(
+#                 IpProtocol="tcp",
+#                 FromPort=22,
+#                 ToPort=22,
+#                 IpRanges=[dict(CidrIp="0.0.0.0/0")],
+#         )])
+#
+#         # Launch builder EC2 instance
+#         instance = get_first(ec2.create_instances(ImageId=builder_image.id,
+#                                                   MinCount=1,
+#                                                   MaxCount=1,
+#                                                   KeyName=key_pair.name,
+#                                                   InstanceType=args.instance_type,
+#                                                   NetworkInterfaces=[dict(
+#                                                           DeviceIndex=0,
+#                                                           SubnetId=subnet_id,
+#                                                           Groups=[sg.id],
+#                                                           AssociatePublicIpAddress=associate_ip,
+#                                                   )]))
+#         defer_terminate(cleanup, instance)
+#
+#         instance.create_tags(Tags=[{"Key": "Name", "Value": run_name}])
+#         instance.wait_until_running()
+#
+#         # Attach source image as device
+#         attach_ebs_image(ec2, instance, source_image, args.device_name)
+#
+#         # Save key pair for ssh
+#         with open(PRIVATE_KEY_FILE, "w") as f:
+#             os.chmod(PRIVATE_KEY_FILE, 0o600)
+#             f.write(key_pair.key_material)
+#
+#         print "To access instance for debugging:"
+#         print "  ssh -i {} {}@{}".format(PRIVATE_KEY_FILE, args.builder_username, getattr(instance, network_type))
+#
+#         ssh_client = connect_ssh(args.builder_username, getattr(instance, network_type), PRIVATE_KEY_FILE)
+#
+#         # Export device to vmdk
+#         provision_file_put(ssh_client, EXPORT_SCRIPT, "export.sh")
+#         provision_shell(ssh_client, ["sudo", "bash", "export.sh", args.device_name, "export.vmdk", args.yum_proxy],
+#                         get_pty=True)
+#         provision_file_get(ssh_client, "export.vmdk", vmdk)
 
     # Package vmdk into vagrant box
-    local_cmd(["bash", PACKAGE_SCRIPT, vmdk, box])
+    #local_cmd(["bash", PACKAGE_SCRIPT, vmdk, box])
 
     # Install guest additions, apply security updates.
-    local_cmd(["bash", GUEST_SCRIPT, box, guestbox])
+    #local_cmd(["bash", GUEST_SCRIPT, box, guestbox])
 
+        print buildtime
+        print prefix
+        print box
 
 if __name__ == "__main__":
     main()
