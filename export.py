@@ -184,15 +184,14 @@ def get_parser():
                    default="amazon",
                    help="Source image owner")
     g.add_argument("--ami-name",
-                   default="amzn-ami-hvm-2016.09.0.20161028-x86_64-gp2",
+                   default="amzn-ami-hvm-2016.09.1.20170119-x86_64-gp2",
                    help="Source image name")
-
     g = parser.add_argument_group("Builder")
     g.add_argument("--builder-ami-owner",
                    default="amazon",
                    help="Builder image owner")
     g.add_argument("--builder-ami-name",
-                   default="amzn-ami-hvm-2016.09.0.20161028-x86_64-gp2",
+                   default="amzn-ami-hvm-2016.09.1.20170119-x86_64-gp2",
                    help="Builder image name")
     g.add_argument("--builder-username",
                    default="ec2-user")
