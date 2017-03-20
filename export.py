@@ -261,7 +261,7 @@ def main():
     subnet_id = subnet.id if subnet else ""
 
     # crk@balfour Have option to use private instance
-    if args.private_network == "true":
+    if args.private_network:
         network_type = "private_ip_address"
         associate_ip = False
     else:
