@@ -313,6 +313,7 @@ def main():
             os.chmod(PRIVATE_KEY_FILE, 0o600)
             f.write(key_pair.key_material)
 
+        print "Network Type: " + network_type
         print "To access instance for debugging:"
         print "  ssh -i {} {}@{}".format(PRIVATE_KEY_FILE, args.builder_username, getattr(instance, network_type))
 
